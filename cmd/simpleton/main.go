@@ -57,7 +57,14 @@ func listenUDP(db *store.SqliteStore) {
 				Payload:    buffer[:n],
 			}
 
-			db.PutData(&data)
+			id, err := db.PutData(&data)
+			if err != nil {
+				log.Printf("Error storing data: %v", err)
+				continue
+			}
+
+			// Update the assigned id
+			data.ID = id
 
 			if parsedOptions.Verbose {
 				json, err := json.Marshal(data)

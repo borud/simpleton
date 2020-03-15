@@ -33,6 +33,7 @@ func New(store *store.SqliteStore, listen string, staticDir string) *Server {
 	}
 }
 
+// dataHandler lists the data in the database
 func (s *Server) dataHandler(w http.ResponseWriter, r *http.Request) {
 	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
 	if err != nil {

@@ -39,12 +39,15 @@ func New(dbFile string) (*SqliteStore, error) {
 }
 
 // PutData stores one row of data in the database
-func (s *SqliteStore) PutData(data *model.Data) error {
+func (s *SqliteStore) PutData(data *model.Data) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.NamedExec("INSERT INTO data (timestamp, from_addr, packet_size, payload) VALUES(:timestamp,:from_addr,:packet_size,:payload)", data)
-	return err
+	r, err := s.db.NamedExec("INSERT INTO data (timestamp, from_addr, packet_size, payload) VALUES(:timestamp,:from_addr,:packet_size,:payload)", data)
+	if err != nil {
+		return 0, err
+	}
+	return r.LastInsertId()
 }
 
 // ListData returns a list of the data from the database sorted by ID
