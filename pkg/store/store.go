@@ -1,11 +1,10 @@
 package store
 
 import (
-	"net"
 	"os"
 	"sync"
-	"time"
 
+	"github.com/borud/simpleton/pkg/model"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // Load sqlite3 driver
 )
@@ -40,10 +39,31 @@ func New(dbFile string) (*SqliteStore, error) {
 }
 
 // PutData stores one row of data in the database
-func (s *SqliteStore) PutData(addr net.Addr, packetSize int, data []byte) error {
+func (s *SqliteStore) PutData(data *model.Data) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec("INSERT INTO data (timestamp, from_addr, packet_size, payload) VALUES(?,?,?,?)", time.Now(), addr.String(), packetSize, data)
+	_, err := s.db.NamedExec("INSERT INTO data (timestamp, from_addr, packet_size, payload) VALUES(:timestamp,:from_addr,:packet_size,:payload)", data)
 	return err
+}
+
+// ListData returns a list of the data from the database sorted by ID
+// in descending order (newest first)
+func (s *SqliteStore) ListData(offset int, limit int) ([]model.Data, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var data []model.Data
+	err := s.db.Select(&data, "SELECT * FROM data ORDER BY id DESC LIMIT ? OFFSET ?", limit, offset)
+	return data, err
+}
+
+// Get fetches a single datapoint by id
+func (s *SqliteStore) Get(id int64) (*model.Data, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var row model.Data
+	err := s.db.QueryRowx("SELECT * FROM data WHERE id = ?", id).StructScan(&row)
+	return &row, err
 }

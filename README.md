@@ -78,3 +78,32 @@ For production uses you should use a PostgreSQL database or similar,
 that is built for concurrency.  But for small experiments and when you
 have limited concurrency, SQLite3 is a surprisingly capable little
 beast.
+
+
+## Accessing via HTTP interface
+
+Note that the HTTP interface has **no authentication or security
+mechanisms** so don't use this for anything other than testing.  The
+default address of the web interface is:
+
+    http://localhost:8008/
+
+The web interface is quite simple.  You have two URLs that access
+data:
+
+    /data
+	/data/{id}
+	
+The first returns a JSON array, the second only returns the payload of
+the data entry given by ID.  The `/data` path will be limited to just
+the 20 newest entries in the database, but you can page through the
+database by setting `offset` and `limit` URL parameters:
+
+    /data?offset=10&limit=10
+	
+
+Simpleton supports having a directory with static files so that you
+can make some HTML pages with useful links to the content or perhaps
+to host JS-frontend applications.
+
+Check the command line help to see the parameters you can fiddle with.

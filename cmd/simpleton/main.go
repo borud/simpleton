@@ -1,17 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"os"
+	"time"
 
+	"github.com/borud/simpleton/pkg/model"
 	"github.com/borud/simpleton/pkg/store"
+	"github.com/borud/simpleton/pkg/web"
 	"github.com/jessevdk/go-flags"
 )
 
 // Options contains the command line options
 //
 type Options struct {
+	// Webserver options
+	WebServerListenAddress string `short:"w" long:"webserver-listen-address" description:"Listen address for webserver" default:":8008" value-name:"[<host>]:<port>"`
+	WebServerStaticDir     string `short:"s" long:"webserver-static-dir" description:"Static dir for files served through webserver" default:"static" value-name:"<directory>"`
+
 	// UDP listener
 	UDPListenAddress string `short:"u" long:"udp-listener" description:"Listen address for UDP listener" default:":7000" value-name:"<[host]:port>"`
 	UDPBufferSize    int    `short:"b" long:"udp-buffer-size" description:"Size of UDP read buffer" default:"1024" value-name:"<num bytes>"`
@@ -34,18 +42,34 @@ func listenUDP(db *store.SqliteStore) {
 		log.Fatalf("Failed to listen to %s: %v", parsedOptions.UDPListenAddress, err)
 	}
 
-	buffer := make([]byte, parsedOptions.UDPBufferSize)
-	for {
-		n, addr, err := pc.ReadFrom(buffer)
-		if err != nil {
-			log.Printf("Error reading, exiting: %v", err)
-		}
-		db.PutData(addr, n, buffer[:n])
+	go func() {
+		buffer := make([]byte, parsedOptions.UDPBufferSize)
+		for {
+			n, addr, err := pc.ReadFrom(buffer)
+			if err != nil {
+				log.Printf("Error reading, exiting: %v", err)
+			}
 
-		if parsedOptions.Verbose {
-			log.Printf("DATA> from='%v' packetSize=%d payload'%x'", addr, n, buffer[:n])
+			data := model.Data{
+				Timestamp:  time.Now(),
+				FromAddr:   addr.String(),
+				PacketSize: n,
+				Payload:    buffer[:n],
+			}
+
+			db.PutData(&data)
+
+			if parsedOptions.Verbose {
+				json, err := json.Marshal(data)
+				if err != nil {
+					log.Printf("Error marshalling to JSON: %v", err)
+					continue
+				}
+				log.Printf("DATA> %s", json)
+			}
 		}
-	}
+	}()
+	log.Printf("Started UDP listener on %s", parsedOptions.UDPListenAddress)
 }
 
 func main() {
@@ -65,5 +89,10 @@ func main() {
 		log.Fatalf("Unable to open or create database: %v", err)
 	}
 
+	// Listen to UDP socket
 	listenUDP(db)
+
+	// Set up webserver
+	webServer := web.New(db, parsedOptions.WebServerListenAddress, parsedOptions.WebServerStaticDir)
+	webServer.ListenAndServe()
 }
